@@ -17,7 +17,30 @@ st_autorefresh(interval=300000, key="auto_refresh")
 
 st.title("📈 Dual Breakout & Breakdown Screener")
 st.caption("Green = Bullish | Red = Bearish | Yellow = Watch")
+def send_email_alert(subject, body):
+    try:
+        msg = EmailMessage()
+        msg["Subject"] = subject
+        msg["From"] = st.secrets["SENDER_EMAIL"]
+        msg["To"] = st.secrets["ALERT_EMAIL"]
+        msg.set_content(body)
 
+        context = ssl.create_default_context()
+
+        with smtplib.SMTP_SSL(
+            "smtp.gmail.com", 465, context=context
+        ) as server:
+            server.login(
+                st.secrets["SENDER_EMAIL"],
+                st.secrets["GMAIL_APP_PASSWORD"]
+            )
+            server.send_message(msg)
+
+        return True
+
+    except Exception as e:
+        st.error(f"Email alert failed: {e}")
+        return False
 DEFAULT_STOCKS = (
     "NVDA,AMD,TSLA,AAPL,MSFT,AMZN,META,GOOGL,AVGO,MU,"
     "MRVL,ALAB,LLY,TER,LRCX,ASML,APP,GS,UNH,COST,SPOT,"
