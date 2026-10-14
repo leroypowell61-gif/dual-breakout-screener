@@ -3,7 +3,9 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 from streamlit_autorefresh import st_autorefresh
-
+import smtplib
+import ssl
+from email.message import EmailMessage
 st.set_page_config(
     page_title="Dual Breakout Screener",
     page_icon="📈",
