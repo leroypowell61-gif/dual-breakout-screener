@@ -2,6 +2,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
+from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(
     page_title="Dual Breakout Screener",
@@ -9,256 +10,220 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📈 Dual Breakout Screener")
-st.write(
-    "Find potential bullish breakouts, bearish breakdowns, "
-    "and triangle chart patterns."
+# Refresh and rescan every 5 minutes
+st_autorefresh(interval=300000, key="auto_refresh")
+
+st.title("📈 Dual Breakout & Breakdown Screener")
+st.caption("Green = Bullish | Red = Bearish | Yellow = Watch")
+
+DEFAULT_STOCKS = (
+    "NVDA,AMD,TSLA,AAPL,MSFT,AMZN,META,GOOGL,AVGO,MU,"
+    "MRVL,ALAB,LLY,TER,LRCX,ASML,APP,GS,UNH,COST,SPOT,"
+    "DELL,TSM,AMAT,KLAC,QCOM,ARM,INTC,SMCI,ORCL,CRM,"
+    "NFLX,PLTR,JPM,COIN,HOOD,UBER,CAT,BA,XOM"
 )
 
-st.warning(
-    "Educational tool only. Signals are not guarantees. "
-    "Confirm trades independently before entering."
+stocks_input = st.text_area(
+    "Stocks to scan (comma-separated)",
+    value=DEFAULT_STOCKS,
+    height=100
 )
 
-default_tickers = (
-    "NVDA, AMD, TSLA, AAPL, MSFT, AMZN, META, "
-    "GOOGL, AVGO, MU, MRVL, ALAB, LLY, TER, LRCX"
-)
+stocks = list(dict.fromkeys(
+    s.strip().upper()
+    for s in stocks_input.split(",")
+    if s.strip()
+))
 
-tickers_input = st.text_area(
-    "Stock tickers (separate with commas)",
-    value=default_tickers
-)
-
-lookback = st.slider(
-    "Resistance/support lookback",
-    min_value=10,
-    max_value=60,
-    value=20
-)
-
-volume_multiplier = st.slider(
-    "Volume confirmation multiplier",
-    min_value=1.0,
-    max_value=3.0,
-    value=1.5,
-    step=0.1
-)
-
-run_scan = st.button("🔍 Scan Stocks", type="primary")
+if st.button("🔄 Scan Now"):
+    st.rerun()
 
 
-def analyze_stock(ticker):
+@st.cache_data(ttl=240, show_spinner=False)
+def get_data(ticker):
     try:
-        df = yf.download(
+        data = yf.download(
             ticker,
-            period="6mo",
-            interval="1d",
+            period="3mo",
+            interval="1h",
             auto_adjust=True,
             progress=False,
             threads=False
         )
 
-        if df.empty or len(df) < lookback + 5:
+        if data.empty:
             return None
 
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
+        if isinstance(data.columns, pd.MultiIndex):
+            data.columns = data.columns.get_level_values(0)
 
-        df = df.dropna(subset=["Close", "High", "Low", "Volume"])
+        data = data.dropna(subset=["Close"])
 
-        close = df["Close"].astype(float)
-        high = df["High"].astype(float)
-        low = df["Low"].astype(float)
-        volume = df["Volume"].astype(float)
+        if len(data) < 25:
+            return None
 
-        price = float(close.iloc[-1])
+        return data
 
-        resistance = float(
-            high.iloc[-lookback-1:-1].max()
-        )
-
-        support = float(
-            low.iloc[-lookback-1:-1].min()
-        )
-
-        avg_volume = float(
-            volume.iloc[-21:-1].mean()
-        )
-
-        current_volume = float(volume.iloc[-1])
-
-        ema20 = float(
-            close.ewm(span=20, adjust=False).mean().iloc[-1]
-        )
-
-        ema50 = float(
-            close.ewm(span=50, adjust=False).mean().iloc[-1]
-        )
-
-        avg_range = float(
-            (high - low).rolling(14).mean().iloc[-1]
-        )
-
-        recent_highs = high.iloc[-10:].to_numpy()
-        recent_lows = low.iloc[-10:].to_numpy()
-
-        high_slope = np.polyfit(
-            np.arange(len(recent_highs)),
-            recent_highs,
-            1
-        )[0]
-
-        low_slope = np.polyfit(
-            np.arange(len(recent_lows)),
-            recent_lows,
-            1
-        )[0]
-
-        contracting = (
-            high_slope < 0
-            and low_slope > 0
-        )
-
-        volume_confirmed = (
-            avg_volume > 0
-            and current_volume >= avg_volume * volume_multiplier
-        )
-
-        bullish = (
-            price > resistance
-            and volume_confirmed
-        )
-
-        bearish = (
-            price < support
-            and volume_confirmed
-        )
-
-        if bullish:
-            signal = "BULLISH BREAKOUT"
-        elif bearish:
-            signal = "BEARISH BREAKDOWN"
-        elif contracting:
-            signal = "POSSIBLE SYMMETRICAL TRIANGLE"
-        elif price > ema20 and ema20 > ema50:
-            signal = "BULLISH TREND"
-        elif price < ema20 and ema20 < ema50:
-            signal = "BEARISH TREND"
-        else:
-            signal = "WAIT / NO CONFIRMED SIGNAL"
-
-        if bullish:
-            entry = resistance
-            stop = resistance - avg_range
-            target = entry + (entry - stop) * 2
-        elif bearish:
-            entry = support
-            stop = support + avg_range
-            target = entry - (stop - entry) * 2
-        else:
-            entry = np.nan
-            stop = np.nan
-            target = np.nan
-
-        return {
-            "Ticker": ticker,
-            "Price": round(price, 2),
-            "Signal": signal,
-            "Resistance": round(resistance, 2),
-            "Support": round(support, 2),
-            "EMA 20": round(ema20, 2),
-            "EMA 50": round(ema50, 2),
-            "Volume Confirmed": "Yes" if volume_confirmed else "No",
-            "Entry Reference": round(entry, 2) if np.isfinite(entry) else None,
-            "Stop Reference": round(stop, 2) if np.isfinite(stop) else None,
-            "2R Target": round(target, 2) if np.isfinite(target) else None,
-        }
-
-    except Exception as e:
-        return {
-            "Ticker": ticker,
-            "Price": None,
-            "Signal": "DATA ERROR",
-            "Resistance": None,
-            "Support": None,
-            "EMA 20": None,
-            "EMA 50": None,
-            "Volume Confirmed": "No",
-            "Entry Reference": None,
-            "Stop Reference": None,
-            "2R Target": None,
-        }
+    except Exception:
+        return None
 
 
-if run_scan:
-    tickers = list(
-        dict.fromkeys(
-            t.strip().upper()
-            for t in tickers_input.split(",")
-            if t.strip()
-        )
+def analyze_stock(ticker):
+    data = get_data(ticker)
+
+    if data is None:
+        return None
+
+    close = data["Close"].astype(float)
+    high = data["High"].astype(float)
+    low = data["Low"].astype(float)
+    volume = data["Volume"].astype(float)
+
+    price = float(close.iloc[-1])
+
+    ema9 = close.ewm(span=9, adjust=False).mean()
+    ema21 = close.ewm(span=21, adjust=False).mean()
+
+    previous_high = float(high.iloc[-21:-1].max())
+    previous_low = float(low.iloc[-21:-1].min())
+
+    avg_volume = float(volume.iloc[-21:-1].mean())
+    current_volume = float(volume.iloc[-1])
+
+    volume_ok = (
+        avg_volume > 0
+        and current_volume >= avg_volume * 1.2
     )
 
-    if not tickers:
-        st.error("Enter at least one stock ticker.")
+    bullish_breakout = (
+        price > previous_high
+        and ema9.iloc[-1] > ema21.iloc[-1]
+        and volume_ok
+    )
+
+    bearish_breakdown = (
+        price < previous_low
+        and ema9.iloc[-1] < ema21.iloc[-1]
+        and volume_ok
+    )
+
+    bullish_trend = (
+        ema9.iloc[-1] > ema21.iloc[-1]
+        and price > ema21.iloc[-1]
+    )
+
+    bearish_trend = (
+        ema9.iloc[-1] < ema21.iloc[-1]
+        and price < ema21.iloc[-1]
+    )
+
+    if bullish_breakout:
+        signal = "🟢 BULLISH BREAKOUT"
+        entry = price
+        stop = previous_high * 0.99
+        target = price + (price - stop) * 2
+
+    elif bearish_breakdown:
+        signal = "🔴 BEARISH BREAKDOWN"
+        entry = price
+        stop = previous_low * 1.01
+        target = price - (stop - price) * 2
+
+    elif bullish_trend:
+        signal = "🟢 BULLISH TREND"
+        entry = price
+        stop = float(ema21.iloc[-1])
+        target = price + (price - stop) * 2
+
+    elif bearish_trend:
+        signal = "🔴 BEARISH TREND"
+        entry = price
+        stop = float(ema21.iloc[-1])
+        target = price - (stop - price) * 2
+
     else:
-        results = []
+        signal = "🟡 WATCH / NO CONFIRMATION"
+        entry = np.nan
+        stop = np.nan
+        target = np.nan
 
-        progress = st.progress(0)
-        status = st.empty()
+    return {
+        "Ticker": ticker,
+        "Price": round(price, 2),
+        "Signal": signal,
+        "Entry Reference": round(entry, 2) if pd.notna(entry) else None,
+        "Stop Reference": round(stop, 2) if pd.notna(stop) else None,
+        "Target (2R)": round(target, 2) if pd.notna(target) else None,
+        "Previous High": round(previous_high, 2),
+        "Previous Low": round(previous_low, 2),
+        "Volume Confirmed": "Yes" if volume_ok else "No"
+    }
 
-        for i, ticker in enumerate(tickers):
-            status.write(f"Scanning {ticker}...")
 
-            result = analyze_stock(ticker)
+if st.button("Clear Cached Data"):
+    st.cache_data.clear()
+    st.rerun()
 
-            if result:
-                results.append(result)
+st.write(f"**Stocks loaded:** {len(stocks)}")
+st.write("Scanning hourly candles. Refreshing automatically every 5 minutes.")
 
-            progress.progress((i + 1) / len(tickers))
+results = []
 
-        status.write("Scan complete!")
+with st.spinner("Scanning stocks..."):
+    progress = st.progress(0)
 
-        if results:
-            results_df = pd.DataFrame(results)
+    for i, ticker in enumerate(stocks):
+        result = analyze_stock(ticker)
 
-            st.subheader("📊 Screener Results")
+        if result:
+            results.append(result)
 
-            bullish_df = results_df[
-                results_df["Signal"] == "BULLISH BREAKOUT"
-            ]
+        progress.progress((i + 1) / max(len(stocks), 1))
 
-            bearish_df = results_df[
-                results_df["Signal"] == "BEARISH BREAKDOWN"
-            ]
+    progress.empty()
 
-            col1, col2, col3 = st.columns(3)
+if results:
+    df = pd.DataFrame(results)
 
-            col1.metric("Stocks Scanned", len(results_df))
-            col2.metric("Bullish Breakouts", len(bullish_df))
-            col3.metric("Bearish Breakdowns", len(bearish_df))
+    def color_signal(row):
+        signal = row["Signal"]
 
-            st.dataframe(
-                results_df,
-                use_container_width=True,
-                hide_index=True
-            )
-
-            st.download_button(
-                "Download Scan Results CSV",
-                data=results_df.to_csv(index=False),
-                file_name="dual_breakout_results.csv",
-                mime="text/csv"
-            )
-
-            st.caption(
-                "Resistance and support use prior daily candles. "
-                "Signals are based on daily closing prices and volume. "
-                "The triangle detector is a simple approximation, "
-                "not a verified chart-pattern recognition system. "
-                "Targets and stops are illustrative price references, "
-                "not predictions or guaranteed execution prices."
-            )
+        if "BREAKOUT" in signal or "BULLISH TREND" in signal:
+            color = "#d4edda"
+        elif "BREAKDOWN" in signal or "BEARISH TREND" in signal:
+            color = "#f8d7da"
         else:
-            st.error("No results returned. Check your internet connection.")
+            color = "#fff3cd"
+
+        return [f"background-color: {color}"] * len(row)
+
+    st.subheader("📊 Live Screener Results")
+
+    st.dataframe(
+        df.style.apply(color_signal, axis=1),
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.subheader("🎯 Signal Summary")
+
+    bullish = df["Signal"].str.contains("BULLISH").sum()
+    bearish = df["Signal"].str.contains("BEARISH").sum()
+    watch = df["Signal"].str.contains("WATCH").sum()
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric("Bullish Setups", int(bullish))
+    col2.metric("Bearish Setups", int(bearish))
+    col3.metric("Watch", int(watch))
+
+    st.info(
+        "Important: These are technical screening signals, not guaranteed "
+        "entries. Confirm the price action and risk before trading options."
+    )
+
+else:
+    st.warning(
+        "No stock data returned. Check your internet connection and "
+        "the ticker symbols, then try again."
+    )
