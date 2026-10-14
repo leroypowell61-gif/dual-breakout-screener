@@ -252,3 +252,14 @@ else:
         "No stock data returned. Check your internet connection and "
         "the ticker symbols, then try again."
     )
+    Discord alerts
+
+import os
+import requests
+
+DISCORD_WEBHOOK_URL = os.getenv(“DISCORD_WEBHOOK_URL”)
+
+if DISCORD_WEBHOOK_URL:
+st.sidebar.success(“Discord alerts configured”)
+else:
+st.sidebar.info(“Discord alerts not configured yet”)
