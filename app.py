@@ -63,7 +63,7 @@ def send_discord_alert(message):
 
     except Exception:
         return False
-        if st.button("Test Discord Alert"):
+if st.button("Test Discord Alert"):
     if send_discord_alert("Discord test successful! Your screener is connected."):
         st.success("Discord alert sent successfully!")
     else:
