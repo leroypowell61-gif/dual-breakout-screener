@@ -44,6 +44,25 @@ def send_email_alert(subject, body):
     except Exception as e:
         st.error(f"Email alert failed: {e}")
         return False
+        def send_discord_alert(message):
+    try:
+        webhook_url = st.secrets.get("DISCORD_WEBHOOK_URL", "")
+        if not webhook_url:
+            return False
+
+        payload = json.dumps({"content": message}).encode("utf-8")
+        request = urllib.request.Request(
+            webhook_url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return 200 <= response.status < 300
+
+    except Exception:
+        return False
 DEFAULT_STOCKS = (
     "NVDA,AMD,TSLA,AAPL,MSFT,AMZN,META,GOOGL,AVGO,MU,"
     "MRVL,ALAB,LLY,TER,LRCX,ASML,APP,GS,UNH,COST,SPOT,"
