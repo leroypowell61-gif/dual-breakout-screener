@@ -231,6 +231,26 @@ with st.spinner("Scanning stocks..."):
 
 if results:
     df = pd.DataFrame(results)
+        # Send alerts for new confirmed breakouts and breakdowns
+    current_signals = {
+        row["Ticker"]: row["Signal"]
+        for _, row in df.iterrows()
+        if "BULLISH BREAKOUT" in row["Signal"]
+        or "BEARISH BREAKDOWN" in row["Signal"]
+    }
+
+    if "previous_discord_signals" not in st.session_state:
+        st.session_state["previous_discord_signals"] = current_signals.copy()
+    else:
+        previous_signals = st.session_state["previous_discord_signals"]
+
+        for ticker, signal in current_signals.items():
+            if previous_signals.get(ticker) != signal:
+                send_discord_alert(
+                    f"📈 Screener Alert: {ticker} — {signal}"
+                )
+
+        st.session_state["previous_discord_signals"] = current_signals.copy()
 
     def color_signal(row):
         signal = row["Signal"]
