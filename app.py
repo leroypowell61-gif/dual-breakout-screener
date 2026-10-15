@@ -63,6 +63,11 @@ def send_discord_alert(message):
 
     except Exception:
         return False
+        if st.button("Test Discord Alert"):
+    if send_discord_alert("Discord test successful! Your screener is connected."):
+        st.success("Discord alert sent successfully!")
+    else:
+        st.error("Discord alert failed. Check your Secrets settings.")
 DEFAULT_STOCKS = (
     "NVDA,AMD,TSLA,AAPL,MSFT,AMZN,META,GOOGL,AVGO,MU,"
     "MRVL,ALAB,LLY,TER,LRCX,ASML,APP,GS,UNH,COST,SPOT,"
