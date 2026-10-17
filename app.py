@@ -171,36 +171,59 @@ def analyze_stock(ticker):
         and price < ema21.iloc[-1]
     )
 
+        true_range = pd.concat(
+        [
+            high - low,
+            (high - close.shift(1)).abs(),
+            (low - close.shift(1)).abs(),
+        ],
+        axis=1,
+    ).max(axis=1)
+
+    atr = float(true_range.rolling(14).mean().iloc[-1])
+
+    if not np.isfinite(atr) or atr <= 0:
+        atr = max(price * 0.01, 0.01)
+
     if bullish_breakout:
         signal = "🟢 BULLISH BREAKOUT"
         entry = price
-        stop = previous_low * 0.99
-        target = price + (price - stop) * 2
+        entry_trigger = previous_high
+        stop = entry - atr
+        target1 = entry + atr
+        target2 = entry + (2 * atr)
 
     elif bearish_breakdown:
         signal = "🔴 BEARISH BREAKDOWN"
         entry = price
-        stop = previous_high * 1.01
-        target = price - (stop - price) * 2
+        entry_trigger = previous_low
+        stop = entry + atr
+        target1 = entry - atr
+        target2 = entry - (2 * atr)
 
     elif bullish_trend:
         signal = "🟢 BULLISH TREND"
         entry = price
-        stop = float(ema21.iloc[-1])
-        risk = entry - stop
-        target = entry + (risk * 2) if risk > 0 else None
+        entry_trigger = float(ema9.iloc[-1])
+        stop = entry - atr
+        target1 = entry + atr
+        target2 = entry + (2 * atr)
 
     elif bearish_trend:
         signal = "🔴 BEARISH TREND"
         entry = price
-        stop = float(ema21.iloc[-1])
-        target = price - (stop - price) * 2
+        entry_trigger = float(ema9.iloc[-1])
+        stop = entry + atr
+        target1 = entry - atr
+        target2 = entry - (2 * atr)
 
     else:
         signal = "🟡 WATCH / NO CONFIRMATION"
         entry = np.nan
+        entry_trigger = np.nan
         stop = np.nan
-        target = np.nan
+        target1 = np.nan
+        target2 = np.nan
 
     return {
         "Ticker": ticker,
