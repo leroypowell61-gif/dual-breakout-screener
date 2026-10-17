@@ -230,7 +230,6 @@ def analyze_stock(ticker):
         "Price": round(price, 2),
         "Signal": signal,
                "Action": (
-                   "Action": (
             "🟢 BREAKOUT CONFIRMED — REVIEW ENTRY"
             if "BULLISH BREAKOUT" in signal
             else "🔴 BREAKDOWN CONFIRMED — REVIEW ENTRY"
