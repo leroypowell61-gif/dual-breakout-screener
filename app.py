@@ -17,8 +17,8 @@ st.set_page_config(
 
 # Refresh and rescan every 5 minutes
 st_autorefresh(interval=300000, key="auto_refresh")
-
-st.title("📈 Dual Breakout & Breakdown Screener")
+st.image("IMG_0166.jpeg", use_container_width=True)
+st.title("⛄🦈 Snowman Shark Finder Screener")
 st.caption("Green = Bullish | Red = Bearish | Yellow = Watch")
 def send_email_alert(subject, body):
     try:
