@@ -278,7 +278,7 @@ if results:
             df = pd.DataFrame(results)
 
     df["Priority"] = df["Signal"].apply(
-        lambda s: 0 if "BULLISH BREAKOUT" in s
+        lambda s: 0 if "BULLISH BREAKOUT" in s 
         else 1 if "BEARISH BREAKDOWN" in s
         else 2 if "BULLISH TREND" in s
         else 3 if "BEARISH TREND" in s
