@@ -235,7 +235,6 @@ def analyze_stock(ticker):
             else "🔴 ENTRY NOW"
             if "BEARISH BREAKDOWN" in signal
             else "🟡 WAIT FOR CONFIRMATION"
-        ),
         "Entry Reference": round(entry, 2) if pd.notna(entry) else None,
         "Entry Trigger": round(entry_trigger, 2) if pd.notna(entry_trigger) else None,
         "Stop Loss (1 ATR)": round(stop, 2) if pd.notna(stop) else None,
