@@ -283,7 +283,7 @@ if results:
         else 4
     )
     df = df.sort_values("Priority").drop(columns=["Priority"])
-        # Send alerts for new confirmed breakouts and breakdowns
+       # Send alerts for new confirmed breakouts and breakdowns
     current_signals = {
         row["Ticker"]: row["Signal"]
         for _, row in df.iterrows()
