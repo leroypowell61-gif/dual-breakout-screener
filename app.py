@@ -184,9 +184,9 @@ def analyze_stock(ticker):
     elif bullish_trend:
         signal = "🟢 BULLISH TREND"
         entry = price
-         stop = float(ema21.iloc[-1])
-         risk = entry - stop
-         target = entry + (risk * 2) if risk > 0 else None
+        stop = float(ema21.iloc[-1])
+        risk = entry - stop
+        target = entry + (risk * 2) if risk > 0 else None
 
     elif bearish_trend:
         signal = "🔴 BEARISH TREND"
