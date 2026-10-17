@@ -282,9 +282,6 @@ if results:
         else 3 if "BEARISH TREND" in s
         else 4
     )
-
-    df = df.sort_values("Priority").drop(columns=["Priority"])
-    )
     df = df.sort_values("Priority").drop(columns=["Priority"])
         # Send alerts for new confirmed breakouts and breakdowns
     current_signals = {
