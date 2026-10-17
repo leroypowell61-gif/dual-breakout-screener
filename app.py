@@ -1,4 +1,4 @@
-stimport streamlit as st
+import streamlit as st
 import json
 import urllib.request
 
