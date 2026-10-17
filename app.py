@@ -132,6 +132,8 @@ def analyze_stock(ticker):
     volume = data["Volume"].astype(float)
 
     price = float(close.iloc[-1])
+    previous_low_value = float(low.iloc[-21:-1].min())
+    previous_high_value = float(high.iloc[-21:-1].max())
 
     ema9 = close.ewm(span=9, adjust=False).mean()
     ema21 = close.ewm(span=21, adjust=False).mean()
