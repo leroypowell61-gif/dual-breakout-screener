@@ -1,4 +1,4 @@
-import streamlit as st
+stimport streamlit as st
 import json
 import urllib.request
 
@@ -275,6 +275,14 @@ with st.spinner("Scanning stocks..."):
 
 if results:
     df = pd.DataFrame(results)
+        df["Priority"] = df["Signal"].apply(
+        lambda s: 0 if "BULLISH BREAKOUT" in s
+        else 1 if "BEARISH BREAKDOWN" in s
+        else 2 if "BULLISH TREND" in s
+        else 3 if "BEARISH TREND" in s
+        else 4
+    )
+    df = df.sort_values("Priority").drop(columns=["Priority"])
         # Send alerts for new confirmed breakouts and breakdowns
     current_signals = {
         row["Ticker"]: row["Signal"]
