@@ -234,6 +234,10 @@ def analyze_stock(ticker):
             if "BULLISH BREAKOUT" in signal
             else "🔴 BREAKDOWN CONFIRMED — REVIEW ENTRY"
             if "BEARISH BREAKDOWN" in signal
+            else "🟢 BULLISH TREND — WAIT"
+            if "BULLISH TREND" in signal
+            else "🔴 BEARISH TREND — WAIT"
+            if "BEARISH TREND" in signal
             else "🟡 WAIT — NO CONFIRMATION"
         ),
         "Entry Reference": round(entry, 2) if pd.notna(entry) else None,
