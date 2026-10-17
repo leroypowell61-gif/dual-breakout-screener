@@ -230,15 +230,17 @@ def analyze_stock(ticker):
         "Price": round(price, 2),
         "Signal": signal,
                "Action": (
-            "🟢 BREAKOUT CONFIRMED — REVIEW ENTRY"
+            "🟢 ENTRY NOW"
             if "BULLISH BREAKOUT" in signal
-            else "🔴 BREAKDOWN CONFIRMED — REVIEW ENTRY"
+            else "🔴 ENTRY NOW"
             if "BEARISH BREAKDOWN" in signal
-            else "🟢 BULLISH TREND — WAIT"
-            if "BULLISH TREND" in signal
-            else "🔴 BEARISH TREND — WAIT"
-            if "BEARISH TREND" in signal
-            else "🟡 WAIT — NO CONFIRMATION"
+            else "🟡 WAIT FOR CONFIRMATION"
+        ),
+        "Entry Reference": round(entry, 2) if pd.notna(entry) else None,
+        "Entry Trigger": round(entry_trigger, 2) if pd.notna(entry_trigger) else None,
+        "Stop Loss (1 ATR)": round(stop, 2) if pd.notna(stop) else None,
+        "Target 1 (1 ATR)": round(target1, 2) if pd.notna(target1) else None,
+        "Target 2 (2 ATR)": round(target2, 2) if pd.notna(target2) else None,
         ),
         "Entry Reference": round(entry, 2) if pd.notna(entry) else None,
         "Entry Trigger": round(entry_trigger, 2) if pd.notna(entry_trigger) else None,
