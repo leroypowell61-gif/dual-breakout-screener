@@ -69,7 +69,6 @@ if st.button("Test Discord Alert"):
     else:
         st.error("Discord alert failed. Check your Secrets settings.")
 DEFAULT_STOCKS = (
-   DEFAULT_STOCKS = (
     "NVDA,AMD,TSLA,AAPL,MSFT,AMZN,META,GOOGL,AVGO,MU,"
     "MRVL,ALAB,LLY,TER,LRCX,ASML,APP,GS,UNH,COST,"
     "SPOT,DELL,TSM,AMAT,MDB,QCOM,ARM,INTC,SMCI,ORCL,"
