@@ -80,7 +80,6 @@ DEFAULT_STOCKS = (
     "C,MS,BLK,V,MA,PYPL,HOOD,SCHW,PFE,MRK,"
     "ABBV,JNJ,REGN,ISRG,AMGN,CVX,COP,SLB,TSCO,TMO"
 )
-)
 
 stocks_input = st.text_area(
     "Stocks to scan (comma-separated)",
