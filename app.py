@@ -172,7 +172,7 @@ def analyze_stock(ticker):
     if bullish_breakout:
         signal = "🟢 BULLISH BREAKOUT"
         entry = price
-        stop = previous_high * 0.99
+        stop = previous_low * 0.99
         target = price + (price - stop) * 2
 
     elif bearish_breakdown:
