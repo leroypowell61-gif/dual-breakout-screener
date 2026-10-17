@@ -210,9 +210,7 @@ def analyze_stock(ticker):
         "Stop Reference": round(stop, 2) if pd.notna(stop) else None,
         "Target (2R)": round(target, 2) if pd.notna(target) else None,
         "Previous High": round(previous_high, 2),
-        "Previous Low": round(previous_low, 2),
-        "Previous Low Check": round(previous_low_value, 2),
-        "Previous High Check": round(previous_high_value, 2),
+        "Previous Low": round(previous_low, 2),       
         "Volume Confirmed": "Yes" if volume_ok else "No"
     }
 
