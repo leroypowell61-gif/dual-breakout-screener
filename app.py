@@ -275,12 +275,17 @@ with st.spinner("Scanning stocks..."):
 
 if results:
     df = pd.DataFrame(results)
-        df["Priority"] = df["Signal"].apply(
-        lambda s: 0 if "BULLISH BREAKOUT" in s
-        else 1 if "BEARISH BREAKDOWN" in s
-        else 2 if "BULLISH TREND" in s
-        else 3 if "BEARISH TREND" in s
-        else 4
+            df = pd.DataFrame(results)
+
+    df["Priority"] = df["Signal"].apply(
+       lambda s: 0 if "BULLISH BREAKOUT" in s
+       else 1 if "BEARISH BREAKDOWN" in s
+       else 2 if "BULLISH TREND" in s
+       else 3 if "BEARISH TREND" in s
+       else 4
+    )
+
+    df = df.sort_values("Priority").drop(columns=["Priority"])
     )
     df = df.sort_values("Priority").drop(columns=["Priority"])
         # Send alerts for new confirmed breakouts and breakdowns
