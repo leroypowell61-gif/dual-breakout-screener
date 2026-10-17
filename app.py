@@ -72,7 +72,7 @@ DEFAULT_STOCKS = (
     "NVDA,AMD,TSLA,AAPL,MSFT,AMZN,META,GOOGL,AVGO,MU,"
     "MRVL,ALAB,LLY,TER,LRCX,ASML,APP,GS,UNH,COST,SPOT,"
     "DELL,TSM,AMAT,mdb,QCOM,ARM,INTC,SMCI,ORCL,CRM,"
-    "NFLX,PLTR,JPM,COIN,HOOD,crwd,CAT,BA,snow,reddt"
+    "NFLX,PLTR,JPM,COIN,xom,crwd,CAT,BA,snow,reddt"
 )
 
 stocks_input = st.text_area(
