@@ -275,8 +275,6 @@ with st.spinner("Scanning stocks..."):
 
 if results:
     df = pd.DataFrame(results)
-            df = pd.DataFrame(results)
-
     df["Priority"] = df["Signal"].apply(
         lambda s: 0 if "BULLISH BREAKOUT" in s 
         else 1 if "BEARISH BREAKDOWN" in s
