@@ -171,7 +171,7 @@ def analyze_stock(ticker):
         and price < ema21.iloc[-1]
     )
 
-        true_range = pd.concat(
+    true_range = pd.concat(
         [
             high - low,
             (high - close.shift(1)).abs(),
