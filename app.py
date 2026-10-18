@@ -192,45 +192,45 @@ def analyze_stock(ticker):
         atr = max(price * 0.01, 0.01)
 
     if bullish_breakout:
-    signal = "🟢 BULLISH BREAKOUT"
-    entry = price
-    entry_trigger = previous_high
-    stop = entry - atr
-    target1 = entry + atr
-    target = entry + (2 * atr)
+        if bullish_breakout:
+        signal = "🟢 BULLISH BREAKOUT"
+        entry = price
+        entry_trigger = previous_high
+        stop = entry - atr
+        target1 = entry + atr
+        target = entry + (2 * atr)
 
-elif bearish_breakdown:
-    signal = "🔴 BEARISH BREAKDOWN"
-    entry = price
-    entry_trigger = previous_low
-    stop = entry + atr
-    target1 = entry - atr
-    target = entry - (2 * atr)
+    elif bearish_breakdown:
+        signal = "🔴 BEARISH BREAKDOWN"
+        entry = price
+        entry_trigger = previous_low
+        stop = entry + atr
+        target1 = entry - atr
+        target = entry - (2 * atr)
 
-elif bullish_trend:
-    signal = "🔵 BULLISH TREND"
-    entry = price
-    entry_trigger = float(ema9.iloc[-1])
-    stop = entry - atr
-    target1 = entry + atr
-    target = entry + (2 * atr)
+    elif bullish_trend:
+        signal = "🔵 BULLISH TREND"
+        entry = price
+        entry_trigger = float(ema9.iloc[-1])
+        stop = entry - atr
+        target1 = entry + atr
+        target = entry + (2 * atr)
 
-elif bearish_trend:
-    signal = "🟠 BEARISH TREND"
-    entry = price
-    entry_trigger = float(ema9.iloc[-1])
-    stop = entry + atr
-    target1 = entry - atr
-    target = entry - (2 * atr)
+    elif bearish_trend:
+        signal = "🟠 BEARISH TREND"
+        entry = price
+        entry_trigger = float(ema9.iloc[-1])
+        stop = entry + atr
+        target1 = entry - atr
+        target = entry - (2 * atr)
 
-else:
-    signal = "⚪ NO SIGNAL"
-    entry = np.nan
-    entry_trigger = np.nan
-    stop = np.nan
-    target1 = np.nan
-    target = np.nan
-
+    else:
+        signal = "⚪ NO SIGNAL"
+        entry = np.nan
+        entry_trigger = np.nan
+        stop = np.nan
+        target1 = np.nan
+        target = np.nan
     return {
         "Ticker": ticker,
         "Price": round(price, 2),
