@@ -191,7 +191,7 @@ def analyze_stock(ticker):
     if not np.isfinite(atr) or atr <= 0:
         atr = max(price * 0.01, 0.01)
 
-   if bullish_breakout:
+    if bullish_breakout:
     signal = "🟢 BULLISH BREAKOUT"
     entry = price
     entry_trigger = previous_high
