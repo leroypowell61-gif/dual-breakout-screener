@@ -192,7 +192,6 @@ def analyze_stock(ticker):
         atr = max(price * 0.01, 0.01)
 
     if bullish_breakout:
-        if bullish_breakout:
         signal = "🟢 BULLISH BREAKOUT"
         entry = price
         entry_trigger = previous_high
