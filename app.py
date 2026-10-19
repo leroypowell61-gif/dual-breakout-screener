@@ -39,11 +39,11 @@ def send_email_alert(subject, body):
             )
             server.send_message(msg)
 
-       return True
+        return True
 
-    except Exception as e:
+     except Exception as e:
          st.error("Email error: " + str(e))
-      return False
+        return False
 
 
 def send_discord_alert(message):
