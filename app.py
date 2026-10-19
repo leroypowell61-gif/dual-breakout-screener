@@ -42,7 +42,7 @@ def send_email_alert(subject, body):
         return True
 
     except Exception as e:
-        st.error("Discord error: " + str(e))
+        st.error(“Discord error: “ + str(e))
         return False
 def send_discord_alert(message):
     try:
