@@ -42,7 +42,7 @@ def send_email_alert(subject, body):
         return True
 
     except Exception as e:
-         st.error("Email error: " + str(e))
+        st.error("Email error: " + str(e))
         return False
 
 
