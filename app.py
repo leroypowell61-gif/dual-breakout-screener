@@ -61,7 +61,7 @@ def send_discord_alert(message):
         with urllib.request.urlopen(request, timeout=10) as response:
             return 200 <= response.status < 300
     except Exception as e:
-            st.error("Discord error: " + str(e))
+        st.error("Discord error: " + str(e))
         return False
 if st.button("Test Discord Alert"):
     if send_discord_alert("Discord test successful! Your screener is connected."):
