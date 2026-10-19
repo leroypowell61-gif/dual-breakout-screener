@@ -39,7 +39,7 @@ def send_email_alert(subject, body):
             )
             server.send_message(msg)
 
-        return True
+         return True
 
      except Exception as e:
          st.error("Email error: " + str(e))
