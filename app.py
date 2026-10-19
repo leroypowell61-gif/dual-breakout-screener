@@ -42,8 +42,8 @@ def send_email_alert(subject, body):
         return True
 
     except Exception as e:
-        st.error(f"Email alert failed: {e}")
-        return False
+st.error(f”Discord error: {e}”)
+return False
 def send_discord_alert(message):
     try:
         webhook_url = st.secrets.get("DISCORD_WEBHOOK_URL", "")
