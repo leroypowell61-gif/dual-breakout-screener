@@ -249,7 +249,7 @@ def analyze_stock(ticker):
         "Entry Trigger": round(entry_trigger, 2) if pd.notna(entry_trigger) else None,
         "Stop Loss (1 ATR)": round(stop, 2) if pd.notna(stop) else None,
         "Target 1 (1 ATR)": round(target1, 2) if pd.notna(target1) else None,
-        "Target 2 (2 ATR)": round(target2, 2) if pd.notna(target2) else None,
+        "Target 2 (2 ATR)": round(target, 2) if pd.notna(target) else None,
         "Previous High": round(previous_high, 2),
         "Previous Low": round(previous_low, 2),       
         "Volume Confirmed": "Yes" if volume_ok else "No"
