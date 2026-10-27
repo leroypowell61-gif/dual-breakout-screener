@@ -397,36 +397,52 @@ if results:
                 send_discord_alert(f"⛄🦈 Screener Alert: {ticker} — {signal}")
         st.session_state["previous_discord_signals"] = current_signals.copy()
 
-    def style_cell(value, column):
-        if column == "1HR Signal":
-            if "BULLISH BREAKOUT" in str(value):
-                return "background-color: #198754; color: white; font-weight: bold"
-            if "BULLISH TREND" in str(value):
-                return "background-color: #0d6efd; color: white; font-weight: bold"
-            if "BEARISH TREND" in str(value):
-                return "background-color: #fd7e14; color: black; font-weight: bold"
-            if "BEARISH BREAKDOWN" in str(value):
-                return "background-color: #dc3545; color: white; font-weight: bold"
-            return "background-color: #e9ecef; color: black"
-        if column in ("2HR Trend", "Daily Trend"):
-            if "BULLISH CONTINUATION" in str(value):
-                return "background-color: #0d6efd; color: white; font-weight: bold"
-            if "BEARISH CONTINUATION" in str(value):
-                return "background-color: #fd7e14; color: black; font-weight: bold"
-            if "MIXED" in str(value):
-                return "background-color: #fff3cd; color: black"
-            if "INSUFFICIENT DATA" in str(value):
-                return "background-color: #e9ecef; color: black"
-        if column == "🎯 SWING SIGNAL":
-            if "BEARISH SWING WATCH" in str(value):
-                return "background-color: #dc3545; color: white; font-weight: bold"
-            if "BULLISH SWING WATCH" in str(value):
-                return "background-color: #198754; color: white; font-weight: bold"
-            if "WAIT" in str(value) or "MIXED" in str(value):
-                return "background-color: #fff3cd; color: black"
-            if "NOT ENOUGH DATA" in str(value):
-                return "background-color: #e9ecef; color: black"
-        return ""
+        for idx, row in dataframe.iterrows():
+        swing = str(row["🎯 SWING SIGNAL"])
+        signal = str(row["1HR Signal"])
+        two_hr = str(row["2HR Trend"])
+        daily = str(row["Daily Trend"])
+
+        # Bearish swing setups get light red.
+        if "BEARISH SWING WATCH" in swing:
+            background = "#fce8e8"
+
+        # Bullish swing setups get light green.
+        elif "BULLISH SWING WATCH" in swing:
+            background = "#e6f4ea"
+
+        # Mixed timeframes get yellow.
+        elif "WAIT" in swing or "MIXED" in swing:
+            background = "#fff3cd"
+
+        # Other bearish signals get light red.
+        elif (
+            "BEARISH" in signal
+            or "BEARISH" in two_hr
+            or "BEARISH" in daily
+        ):
+            background = "#fce8e8"
+
+        # Other bullish signals get light green.
+        elif (
+            "BULLISH" in signal
+            or "BULLISH" in two_hr
+            or "BULLISH" in daily
+        ):
+            background = "#e6f4ea"
+
+        else:
+            background = "#e9ecef"
+
+        for column in dataframe.columns:
+            styles.loc[idx, column] = (
+                f"background-color: {background}; color: black;"
+            )
+
+        styles.loc[idx, "1HR Signal"] += " font-weight: bold;"
+        styles.loc[idx, "🎯 SWING SIGNAL"] += " font-weight: bold;"
+
+    return styles
 
     def style_table(dataframe):
         styles = pd.DataFrame("", index=dataframe.index, columns=dataframe.columns)
