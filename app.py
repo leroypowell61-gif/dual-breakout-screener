@@ -444,14 +444,49 @@ if results:
 
     return styles
 
-    def style_table(dataframe):
-        styles = pd.DataFrame("", index=dataframe.index, columns=dataframe.columns)
-        for column in dataframe.columns:
-            styles[column] = dataframe[column].map(
-                lambda value: style_cell(value, column)
-            )
-        return styles
+        def style_table(dataframe):
+        styles = pd.DataFrame(
+            "",
+            index=dataframe.index,
+            columns=dataframe.columns
+        )
 
+        for idx, row in dataframe.iterrows():
+            swing = str(row["🎯 SWING SIGNAL"])
+            signal = str(row["1HR Signal"])
+            two_hr = str(row["2HR Trend"])
+            daily = str(row["Daily Trend"])
+
+            if "BEARISH SWING WATCH" in swing:
+                background = "#fce8e8"
+            elif "BULLISH SWING WATCH" in swing:
+                background = "#e6f4ea"
+            elif "WAIT" in swing or "MIXED" in swing:
+                background = "#fff3cd"
+            elif (
+                "BEARISH" in signal
+                or "BEARISH" in two_hr
+                or "BEARISH" in daily
+            ):
+                background = "#fce8e8"
+            elif (
+                "BULLISH" in signal
+                or "BULLISH" in two_hr
+                or "BULLISH" in daily
+            ):
+                background = "#e6f4ea"
+            else:
+                background = "#e9ecef"
+
+            for column in dataframe.columns:
+                styles.loc[idx, column] = (
+                    f"background-color: {background}; color: black;"
+                )
+
+            styles.loc[idx, "1HR Signal"] += " font-weight: bold;"
+            styles.loc[idx, "🎯 SWING SIGNAL"] += " font-weight: bold;"
+
+        return styles
     st.subheader("📊 Live Screener Results")
     st.dataframe(
         df.style.apply(style_table, axis=None),
