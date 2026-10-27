@@ -1,4 +1,4 @@
-    def style_table(dataframe):
+def style_table(dataframe):
         styles = pd.DataFrame(
             "",
             index=dataframe.index,
