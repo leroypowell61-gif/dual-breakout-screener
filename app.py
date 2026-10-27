@@ -1,25 +1,42 @@
 import streamlit as st
 import json
 import urllib.request
+import smtplib
+import ssl
+from email.message import EmailMessage
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import yfinance as yf
 import pandas as pd
 import numpy as np
 from streamlit_autorefresh import st_autorefresh
-import smtplib
-import ssl
-from email.message import EmailMessage
+
+
 st.set_page_config(
-    page_title="Dual Breakout Screener",
-    page_icon="📈",
-    layout="wide"
+    page_title="Snowman Shark Finder Screener",
+    page_icon="⛄",
+    layout="wide",
 )
 
-# Refresh and rescan every 5 minutes
+# Refresh the screener every 5 minutes.
 st_autorefresh(interval=300000, key="auto_refresh")
-st.image("IMG_0166.jpeg", use_container_width=True)
+
+try:
+    st.image("IMG_0166.jpeg", use_container_width=True)
+except Exception:
+    pass
+
 st.title("⛄🦈 Snowman Shark Finder Screener")
-st.caption("Green = Bullish | Red = Bearish | Yellow = Watch")
+st.caption(
+    "1HR = day/entry signal  |  2HR = swing continuation  |  Daily = larger trend"
+)
+st.markdown(
+    "**Signal colors:** 🟢 Bullish breakout  |  🔵 Bullish trend  |  "
+    "🟠 Bearish trend  |  🔴 Bearish breakdown  |  ⚪ No signal"
+)
+
+
 def send_email_alert(subject, body):
     try:
         msg = EmailMessage()
@@ -29,18 +46,13 @@ def send_email_alert(subject, body):
         msg.set_content(body)
 
         context = ssl.create_default_context()
-
-        with smtplib.SMTP_SSL(
-            "smtp.gmail.com", 465, context=context
-        ) as server:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
             server.login(
                 st.secrets["SENDER_EMAIL"],
-                st.secrets["GMAIL_APP_PASSWORD"]
+                st.secrets["GMAIL_APP_PASSWORD"],
             )
             server.send_message(msg)
-
         return True
-
     except Exception as e:
         st.error("Email error: " + str(e))
         return False
@@ -59,17 +71,13 @@ def send_discord_alert(message):
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-
         with urllib.request.urlopen(request, timeout=10) as response:
             return 200 <= response.status < 300
     except Exception as e:
         st.error("Discord error: " + str(e))
         return False
-if st.button("Test Discord Alert"):
-    if send_discord_alert("Discord test successful! Your screener is connected."):
-         st.success("Discord alert sent successfully!")
-    else:
-        st.error("Discord alert failed. Check your Secrets settings.")
+
+
 DEFAULT_STOCKS = (
     "NVDA,AMD,TSLA,AAPL,MSFT,AMZN,META,GOOGL,AVGO,MU,"
     "MRVL,ALAB,LLY,TER,LRCX,ASML,APP,GS,UNH,COST,"
@@ -86,98 +94,136 @@ DEFAULT_STOCKS = (
 stocks_input = st.text_area(
     "Stocks to scan (comma-separated)",
     value=DEFAULT_STOCKS,
-    height=100
+    height=100,
+)
+stocks = list(
+    dict.fromkeys(
+        symbol.strip().upper()
+        for symbol in stocks_input.split(",")
+        if symbol.strip()
+    )
 )
 
-stocks = list(dict.fromkeys(
-    s.strip().upper()
-    for s in stocks_input.split(",")
-    if s.strip()
-))
-
-if st.button("🔄 Scan Now"):
-    st.rerun()
+col_scan, col_clear = st.columns(2)
+with col_scan:
+    if st.button("🔄 Scan Now"):
+        st.rerun()
+with col_clear:
+    if st.button("Clear Cached Data"):
+        st.cache_data.clear()
+        st.rerun()
 
 
 @st.cache_data(ttl=240, show_spinner=False)
-def get_data(ticker):
+def get_data(ticker, interval, period):
+    """Download and normalize OHLCV data from Yahoo Finance."""
     try:
         data = yf.download(
             ticker,
-            period="3mo",
-            interval="1h",
+            period=period,
+            interval=interval,
             auto_adjust=True,
             progress=False,
-            threads=False
+            threads=False,
         )
-
         if data.empty:
             return None
 
         if isinstance(data.columns, pd.MultiIndex):
             data.columns = data.columns.get_level_values(0)
 
-        data = data.dropna(subset=["Close"])
-
-        if len(data) < 25:
+        needed = ["Open", "High", "Low", "Close", "Volume"]
+        if not all(column in data.columns for column in needed):
             return None
 
+        data = data[needed].dropna(subset=["Close"]).sort_index()
+        if data.empty:
+            return None
         return data
-
     except Exception:
         return None
 
 
-def analyze_stock(ticker):
-    data = get_data(ticker)
+def trend_state(data, timeframe, exclude_last=False):
+    """
+    Classify trend using EMA 9 and EMA 21.
+    For 2HR, the hourly data is resampled and the newest bar is excluded
+    to reduce the chance of using a still-forming candle.
+    """
+    if data is None or len(data) < 25:
+        return "⚪ INSUFFICIENT DATA"
 
-    if data is None:
+    frame = data.copy()
+    if exclude_last and len(frame) > 25:
+        frame = frame.iloc[:-1]
+
+    close = frame["Close"].astype(float)
+    if len(close) < 25:
+        return "⚪ INSUFFICIENT DATA"
+
+    ema9 = close.ewm(span=9, adjust=False).mean()
+    ema21 = close.ewm(span=21, adjust=False).mean()
+    last_close = float(close.iloc[-1])
+
+    if ema9.iloc[-1] > ema21.iloc[-1] and last_close > ema21.iloc[-1]:
+        return "🟢 BULLISH CONTINUATION"
+    if ema9.iloc[-1] < ema21.iloc[-1] and last_close < ema21.iloc[-1]:
+        return "🔴 BEARISH CONTINUATION"
+    return "🟡 MIXED / WAIT"
+
+
+def daily_trend_state(data):
+    """Use the latest completed daily candle where possible."""
+    if data is None or len(data) < 25:
+        return "⚪ INSUFFICIENT DATA"
+
+    frame = data.copy()
+    try:
+        # During the regular New York trading day, today's daily candle
+        # is still forming. Exclude it until 4:00 p.m. Eastern.
+        now_et = datetime.now(ZoneInfo("America/New_York"))
+        latest_date = pd.Timestamp(frame.index[-1]).date()
+        if latest_date == now_et.date() and now_et.hour < 16 and len(frame) > 25:
+            frame = frame.iloc[:-1]
+    except Exception:
+        pass
+
+    return trend_state(frame, "Daily")
+
+
+def analyze_stock(ticker):
+    hourly = get_data(ticker, "1h", "3mo")
+    if hourly is None or len(hourly) < 25:
         return None
 
-    close = data["Close"].astype(float)
-    high = data["High"].astype(float)
-    low = data["Low"].astype(float)
-    volume = data["Volume"].astype(float)
+    close = hourly["Close"].astype(float)
+    high = hourly["High"].astype(float)
+    low = hourly["Low"].astype(float)
+    volume = hourly["Volume"].astype(float)
 
     price = float(close.iloc[-1])
-    previous_low_value = float(low.iloc[-21:-1].min())
-    previous_high_value = float(high.iloc[-21:-1].max())
+    previous_high = float(high.iloc[-21:-1].max())
+    previous_low = float(low.iloc[-21:-1].min())
 
     ema9 = close.ewm(span=9, adjust=False).mean()
     ema21 = close.ewm(span=21, adjust=False).mean()
 
-    previous_high = float(high.iloc[-21:-1].max())
-    previous_low = float(low.iloc[-21:-1].min())
-
     avg_volume = float(volume.iloc[-21:-1].mean())
     current_volume = float(volume.iloc[-1])
-
-    volume_ok = (
-        avg_volume > 0
-        and current_volume >= avg_volume * 1.2
-    )
+    volume_ok = avg_volume > 0 and current_volume >= avg_volume * 1.2
 
     bullish_breakout = (
         price > previous_high
         and ema9.iloc[-1] > ema21.iloc[-1]
         and volume_ok
     )
-
     bearish_breakdown = (
         price < previous_low
         and ema9.iloc[-1] < ema21.iloc[-1]
         and volume_ok
     )
-
-    bullish_trend = (
-        ema9.iloc[-1] > ema21.iloc[-1]
-        and price > ema21.iloc[-1]
-    )
-
-    bearish_trend = (
-        ema9.iloc[-1] < ema21.iloc[-1]
-        and price < ema21.iloc[-1]
-    )
+    bullish_trend = ema9.iloc[-1] > ema21.iloc[-1] and price > ema21.iloc[-1]
+    bearish_trend = ema9.iloc[-1] < ema21.iloc[-1] and price < ema21.iloc[-1]
 
     true_range = pd.concat(
         [
@@ -187,9 +233,7 @@ def analyze_stock(ticker):
         ],
         axis=1,
     ).max(axis=1)
-
     atr = float(true_range.rolling(14).mean().iloc[-1])
-
     if not np.isfinite(atr) or atr <= 0:
         atr = max(price * 0.01, 0.01)
 
@@ -199,160 +243,229 @@ def analyze_stock(ticker):
         entry_trigger = previous_high
         stop = entry - atr
         target1 = entry + atr
-        target = entry + (2 * atr)
-
+        target2 = entry + (2 * atr)
     elif bearish_breakdown:
         signal = "🔴 BEARISH BREAKDOWN"
         entry = price
         entry_trigger = previous_low
         stop = entry + atr
         target1 = entry - atr
-        target = entry - (2 * atr)
-
+        target2 = entry - (2 * atr)
     elif bullish_trend:
         signal = "🔵 BULLISH TREND"
         entry = price
         entry_trigger = float(ema9.iloc[-1])
         stop = entry - atr
         target1 = entry + atr
-        target = entry + (2 * atr)
-
+        target2 = entry + (2 * atr)
     elif bearish_trend:
         signal = "🟠 BEARISH TREND"
         entry = price
         entry_trigger = float(ema9.iloc[-1])
         stop = entry + atr
         target1 = entry - atr
-        target = entry - (2 * atr)
-
+        target2 = entry - (2 * atr)
     else:
         signal = "⚪ NO SIGNAL"
         entry = np.nan
         entry_trigger = np.nan
         stop = np.nan
         target1 = np.nan
-        target = np.nan
+        target2 = np.nan
+
+    # Build the 2-hour candles from hourly candles.
+    # Yahoo's hourly feed is used because a native 2-hour interval is not
+    # consistently available. Drop the newest 2-hour bar to be conservative.
+    two_hour = hourly.resample("2h", label="left", closed="left").agg(
+        {
+            "Open": "first",
+            "High": "max",
+            "Low": "min",
+            "Close": "last",
+            "Volume": "sum",
+        }
+    )
+    two_hour = two_hour.dropna(subset=["Close"])
+    two_hour_state = trend_state(two_hour, "2HR", exclude_last=True)
+
+    # Derive daily candles from the already-downloaded hourly data. This avoids
+    # a second Yahoo request for every ticker and helps reduce rate limiting.
+    daily = hourly.resample("1D").agg(
+        {
+            "Open": "first",
+            "High": "max",
+            "Low": "min",
+            "Close": "last",
+            "Volume": "sum",
+        }
+    ).dropna(subset=["Close"])
+    daily_state = daily_trend_state(daily)
+
+    if (
+        "BULLISH CONTINUATION" in two_hour_state
+        and "BULLISH CONTINUATION" in daily_state
+    ):
+        swing_setup = "🟢 BULLISH SWING WATCH"
+    elif (
+        "BEARISH CONTINUATION" in two_hour_state
+        and "BEARISH CONTINUATION" in daily_state
+    ):
+        swing_setup = "🔴 BEARISH SWING WATCH"
+    elif "INSUFFICIENT DATA" in two_hour_state or "INSUFFICIENT DATA" in daily_state:
+        swing_setup = "⚪ NOT ENOUGH DATA"
+    else:
+        swing_setup = "🟡 WAIT — TIMEFRAMES MIXED"
+
+    action = (
+        "🟢 BREAKOUT — REVIEW ENTRY"
+        if "BULLISH BREAKOUT" in signal
+        else "🔴 BREAKDOWN — REVIEW ENTRY"
+        if "BEARISH BREAKDOWN" in signal
+        else "🟢 BULLISH TREND — WATCH ENTRY"
+        if "BULLISH TREND" in signal
+        else "🔴 BEARISH TREND — WATCH ENTRY"
+        if "BEARISH TREND" in signal
+        else "⚪ WAIT — NO CLEAR 1HR SIGNAL"
+    )
+
     return {
         "Ticker": ticker,
         "Price": round(price, 2),
-        "Signal": signal,
-               "Action": (
-            "🟢 BREAKOUT CONFIRMED — REVIEW ENTRY"
-            if "BULLISH BREAKOUT" in signal
-            else "🔴 BREAKDOWN CONFIRMED — REVIEW ENTRY"
-            if "BEARISH BREAKDOWN" in signal
-            else "🟢 BULLISH TREND — WATCH ENTRY"
-            if "BULLISH TREND" in signal
-            else "🔴 BEARISH TREND — WATCH ENTRY"
-            if "BEARISH TREND" in signal
-            else "🟡 WAIT — NO CLEAR SETUP"
-        ),
+        "1HR Signal": signal,
+        "1HR Action": action,
+        "2HR Continuation": two_hour_state,
+        "Daily Trend": daily_state,
+        "SWING SETUP": swing_setup,
         "Entry Reference": round(entry, 2) if pd.notna(entry) else None,
         "Entry Trigger": round(entry_trigger, 2) if pd.notna(entry_trigger) else None,
         "Stop Loss (1 ATR)": round(stop, 2) if pd.notna(stop) else None,
         "Target 1 (1 ATR)": round(target1, 2) if pd.notna(target1) else None,
-        "Target 2 (2 ATR)": round(target, 2) if pd.notna(target) else None,
+        "Target 2 (2 ATR)": round(target2, 2) if pd.notna(target2) else None,
         "Previous High": round(previous_high, 2),
-        "Previous Low": round(previous_low, 2),       
-        "Volume Confirmed": "Yes" if volume_ok else "No"
+        "Previous Low": round(previous_low, 2),
+        "Volume Confirmed": "Yes" if volume_ok else "No",
     }
 
 
-if st.button("Clear Cached Data"):
-    st.cache_data.clear()
-    st.rerun()
-
 st.write(f"**Stocks loaded:** {len(stocks)}")
-st.write("Scanning hourly candles. Refreshing automatically every 5 minutes.")
+st.write(
+    "Scanning 1HR signals, 2HR continuation, and Daily trend. "
+    "The screener refreshes automatically every 5 minutes."
+)
+st.caption(
+    "How to use it: 1HR helps with timing; 2HR + Daily alignment creates a "
+    "swing watch. A swing watch is not an automatic entry—check price action "
+    "and risk before trading."
+)
 
 results = []
-
-with st.spinner("Scanning stocks..."):
+with st.spinner("Scanning stocks across timeframes..."):
     progress = st.progress(0)
-
     for i, ticker in enumerate(stocks):
         result = analyze_stock(ticker)
-
         if result:
             results.append(result)
-
         progress.progress((i + 1) / max(len(stocks), 1))
-
     progress.empty()
 
 if results:
     df = pd.DataFrame(results)
-    df["Priority"] = df["Signal"].apply(
-        lambda s: 0 if "BULLISH BREAKOUT" in s
-        else 1 if "BEARISH BREAKDOWN" in s
-        else 2 if "BULLISH TREND" in s
-        else 3 if "BEARISH TREND" in s
-        else 4
-    )
-    df = df.sort_values("Priority").drop(columns=["Priority"])
-       # Send alerts for new confirmed breakouts and breakdowns
-    current_signals = {
-        row["Ticker"]: row["Signal"]
-        for _, row in df.iterrows()
-        if "BULLISH BREAKOUT" in row["Signal"]
-        or "BEARISH BREAKDOWN" in row["Signal"]
-    }
 
+    def priority(row):
+        swing = row["SWING SETUP"]
+        signal = row["1HR Signal"]
+        if "BEARISH SWING WATCH" in swing:
+            return 0
+        if "BULLISH SWING WATCH" in swing:
+            return 1
+        if "BEARISH BREAKDOWN" in signal:
+            return 2
+        if "BULLISH BREAKOUT" in signal:
+            return 3
+        if "BEARISH TREND" in signal:
+            return 4
+        if "BULLISH TREND" in signal:
+            return 5
+        return 6
+
+    df["_Priority"] = df.apply(priority, axis=1)
+    df = df.sort_values("_Priority").drop(columns=["_Priority"])
+
+    # Alert only when a ticker's confirmed 1HR breakout/breakdown changes.
+    current_signals = {
+        row["Ticker"]: row["1HR Signal"]
+        for _, row in df.iterrows()
+        if "BULLISH BREAKOUT" in row["1HR Signal"]
+        or "BEARISH BREAKDOWN" in row["1HR Signal"]
+    }
     if "previous_discord_signals" not in st.session_state:
         st.session_state["previous_discord_signals"] = current_signals.copy()
     else:
         previous_signals = st.session_state["previous_discord_signals"]
-
         for ticker, signal in current_signals.items():
             if previous_signals.get(ticker) != signal:
-                send_discord_alert(
-                    f"📈 Screener Alert: {ticker} — {signal}"
-                )
-
+                send_discord_alert(f"⛄🦈 Screener Alert: {ticker} — {signal}")
         st.session_state["previous_discord_signals"] = current_signals.copy()
 
-    def color_signal(row):
-        signal = row["Signal"]
+    def style_cell(value, column):
+        if column == "1HR Signal":
+            if "BULLISH BREAKOUT" in str(value):
+                return "background-color: #198754; color: white; font-weight: bold"
+            if "BULLISH TREND" in str(value):
+                return "background-color: #0d6efd; color: white; font-weight: bold"
+            if "BEARISH TREND" in str(value):
+                return "background-color: #fd7e14; color: black; font-weight: bold"
+            if "BEARISH BREAKDOWN" in str(value):
+                return "background-color: #dc3545; color: white; font-weight: bold"
+            return "background-color: #e9ecef; color: black"
+        if column == "SWING SETUP":
+            if "BEARISH SWING WATCH" in str(value):
+                return "background-color: #dc3545; color: white; font-weight: bold"
+            if "BULLISH SWING WATCH" in str(value):
+                return "background-color: #198754; color: white; font-weight: bold"
+            if "WAIT" in str(value) or "MIXED" in str(value):
+                return "background-color: #fff3cd; color: black"
+        return ""
 
-        if "BREAKOUT" in signal or "BULLISH TREND" in signal:
-            color = "#d4edda"
-        elif "BREAKDOWN" in signal or "BEARISH TREND" in signal:
-            color = "#f8d7da"
-        else:
-            color = "#fff3cd"
-
-        return [f"background-color: {color}"] * len(row)
+    def style_table(dataframe):
+        styles = pd.DataFrame("", index=dataframe.index, columns=dataframe.columns)
+        for column in dataframe.columns:
+            styles[column] = dataframe[column].map(
+                lambda value: style_cell(value, column)
+            )
+        return styles
 
     st.subheader("📊 Live Screener Results")
-
     st.dataframe(
-        df.style.apply(color_signal, axis=1),
+        df.style.apply(style_table, axis=None),
         use_container_width=True,
-        hide_index=True
+        hide_index=True,
     )
 
     st.subheader("🎯 Signal Summary")
+    bullish = df["1HR Signal"].str.contains("BULLISH").sum()
+    bearish = df["1HR Signal"].str.contains("BEARISH").sum()
+    bullish_swings = df["SWING SETUP"].str.contains("BULLISH SWING WATCH").sum()
+    bearish_swings = df["SWING SETUP"].str.contains("BEARISH SWING WATCH").sum()
+    mixed = df["SWING SETUP"].str.contains("WAIT").sum()
 
-    bullish = df["Signal"].str.contains("BULLISH").sum()
-    bearish = df["Signal"].str.contains("BEARISH").sum()
-    watch = df["Signal"].str.contains("WATCH").sum()
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric("Bullish Setups", int(bullish))
-    col2.metric("Bearish Setups", int(bearish))
-    col3.metric("Watch", int(watch))
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("1HR Bullish", int(bullish))
+    c2.metric("1HR Bearish", int(bearish))
+    c3.metric("Bullish Swing Watches", int(bullish_swings))
+    c4.metric("Bearish Swing Watches", int(bearish_swings))
+    c5.metric("Mixed / Wait", int(mixed))
 
     st.info(
-        "Important: These are technical screening signals, not guaranteed "
-        "entries. Confirm the price action and risk before trading options."
+        "These are technical screening signals, not guaranteed entries or "
+        "predictions. The 2HR and Daily columns are trend filters. Confirm "
+        "the price action and manage risk before trading options."
     )
-
 else:
     st.warning(
-        "No stock data returned. Check your internet connection and "
-        "the ticker symbols, then try again."
+        "No stock data returned. Check your internet connection and ticker "
+        "symbols, then try again."
     )
-    
+
 
 
