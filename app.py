@@ -29,7 +29,7 @@ except Exception:
 
 st.title("⛄🦈 Snowman Shark Finder Screener")
 st.caption(
-    "1HR = day/entry signal  |  2HR = swing continuation  |  Daily = larger trend"
+    "1HR = entry timing  |  2HR + Daily agreement = swing direction"
 )
 st.markdown(
     "**Signal colors:** 🟢 Bullish breakout  |  🔵 Bullish trend  |  "
@@ -316,26 +316,13 @@ def analyze_stock(ticker):
     else:
         swing_setup = "🟡 WAIT — TIMEFRAMES MIXED"
 
-    action = (
-        "🟢 BREAKOUT — REVIEW ENTRY"
-        if "BULLISH BREAKOUT" in signal
-        else "🔴 BREAKDOWN — REVIEW ENTRY"
-        if "BEARISH BREAKDOWN" in signal
-        else "🟢 BULLISH TREND — WATCH ENTRY"
-        if "BULLISH TREND" in signal
-        else "🔴 BEARISH TREND — WATCH ENTRY"
-        if "BEARISH TREND" in signal
-        else "⚪ WAIT — NO CLEAR 1HR SIGNAL"
-    )
-
     return {
         "Ticker": ticker,
         "Price": round(price, 2),
         "1HR Signal": signal,
-        "1HR Action": action,
-        "2HR Continuation": two_hour_state,
+        "2HR Trend": two_hour_state,
         "Daily Trend": daily_state,
-        "SWING SETUP": swing_setup,
+        "🎯 SWING SIGNAL": swing_setup,
         "Entry Reference": round(entry, 2) if pd.notna(entry) else None,
         "Entry Trigger": round(entry_trigger, 2) if pd.notna(entry_trigger) else None,
         "Stop Loss (1 ATR)": round(stop, 2) if pd.notna(stop) else None,
@@ -349,12 +336,12 @@ def analyze_stock(ticker):
 
 st.write(f"**Stocks loaded:** {len(stocks)}")
 st.write(
-    "Scanning 1HR signals, 2HR continuation, and Daily trend. "
+    "Scanning 1HR signals, 2HR trend, and Daily trend. "
     "The screener refreshes automatically every 5 minutes."
 )
 st.caption(
     "How to use it: 1HR helps with timing; 2HR + Daily alignment creates a "
-    "swing watch. A swing watch is not an automatic entry—check price action "
+    "swing signal. A swing signal is not an automatic entry—check price action "
     "and risk before trading."
 )
 
@@ -372,21 +359,24 @@ if results:
     df = pd.DataFrame(results)
 
     def priority(row):
-        swing = row["SWING SETUP"]
-        signal = row["1HR Signal"]
+        """Show bearish opportunities first, then bullish, then mixed/no signal."""
+        swing = str(row["🎯 SWING SIGNAL"])
+        signal = str(row["1HR Signal"])
         if "BEARISH SWING WATCH" in swing:
             return 0
-        if "BULLISH SWING WATCH" in swing:
-            return 1
         if "BEARISH BREAKDOWN" in signal:
-            return 2
-        if "BULLISH BREAKOUT" in signal:
-            return 3
+            return 1
         if "BEARISH TREND" in signal:
+            return 2
+        if "BULLISH SWING WATCH" in swing:
+            return 3
+        if "BULLISH BREAKOUT" in signal:
             return 4
         if "BULLISH TREND" in signal:
             return 5
-        return 6
+        if "WAIT" in swing or "MIXED" in swing:
+            return 6
+        return 7
 
     df["_Priority"] = df.apply(priority, axis=1)
     df = df.sort_values("_Priority").drop(columns=["_Priority"])
@@ -418,13 +408,24 @@ if results:
             if "BEARISH BREAKDOWN" in str(value):
                 return "background-color: #dc3545; color: white; font-weight: bold"
             return "background-color: #e9ecef; color: black"
-        if column == "SWING SETUP":
+        if column in ("2HR Trend", "Daily Trend"):
+            if "BULLISH CONTINUATION" in str(value):
+                return "background-color: #0d6efd; color: white; font-weight: bold"
+            if "BEARISH CONTINUATION" in str(value):
+                return "background-color: #fd7e14; color: black; font-weight: bold"
+            if "MIXED" in str(value):
+                return "background-color: #fff3cd; color: black"
+            if "INSUFFICIENT DATA" in str(value):
+                return "background-color: #e9ecef; color: black"
+        if column == "🎯 SWING SIGNAL":
             if "BEARISH SWING WATCH" in str(value):
                 return "background-color: #dc3545; color: white; font-weight: bold"
             if "BULLISH SWING WATCH" in str(value):
                 return "background-color: #198754; color: white; font-weight: bold"
             if "WAIT" in str(value) or "MIXED" in str(value):
                 return "background-color: #fff3cd; color: black"
+            if "NOT ENOUGH DATA" in str(value):
+                return "background-color: #e9ecef; color: black"
         return ""
 
     def style_table(dataframe):
@@ -445,9 +446,9 @@ if results:
     st.subheader("🎯 Signal Summary")
     bullish = df["1HR Signal"].str.contains("BULLISH").sum()
     bearish = df["1HR Signal"].str.contains("BEARISH").sum()
-    bullish_swings = df["SWING SETUP"].str.contains("BULLISH SWING WATCH").sum()
-    bearish_swings = df["SWING SETUP"].str.contains("BEARISH SWING WATCH").sum()
-    mixed = df["SWING SETUP"].str.contains("WAIT").sum()
+    bullish_swings = df["🎯 SWING SIGNAL"].str.contains("BULLISH SWING WATCH").sum()
+    bearish_swings = df["🎯 SWING SIGNAL"].str.contains("BEARISH SWING WATCH").sum()
+    mixed = df["🎯 SWING SIGNAL"].str.contains("WAIT|MIXED", regex=True).sum()
 
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("1HR Bullish", int(bullish))
@@ -466,6 +467,4 @@ else:
         "No stock data returned. Check your internet connection and ticker "
         "symbols, then try again."
     )
-
-
 
